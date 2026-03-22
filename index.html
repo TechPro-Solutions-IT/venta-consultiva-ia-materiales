@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rosso Materiales - Asistente IA 24/7</title>
+    <style>
+        /* CSS Estilos - Aspecto Profesional y Moderno */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; margin: 0; padding: 0; }
+        
+        /* Botón Flotante para abrir el Chat */
+        #chat-circle { position: fixed; bottom: 20px; right: 20px; background: #004a99; /* Azul Rosso */ width: 60px; height: 60px; border-radius: 50%; color: white; text-align: center; line-height: 60px; font-size: 24px; cursor: pointer; box-shadow: 0px 3px 15px rgba(0,0,0,0.2); z-index: 1000; transition: transform 0.3s; }
+        #chat-circle:hover { transform: scale(1.1); }
+
+        /* Contenedor del Chat (Oculto por defecto) */
+        .chat-box { display: none; position: fixed; bottom: 90px; right: 20px; width: 350px; max-width: 85vw; height: 500px; max-height: 70vh; background: white; border-radius: 10px; box-shadow: 0px 5px 30px rgba(0,0,0,0.15); overflow: hidden; z-index: 1000; flex-direction: column; }
+        
+        /* Cabecera del Chat */
+        .chat-box-header { background: #004a99; height: 50px; color: white; text-align: center; line-height: 50px; font-weight: bold; position: relative; }
+        .chat-box-toggle { position: absolute; top: 0; right: 10px; cursor: pointer; font-size: 20px; }
+
+        /* Cuerpo del Chat (donde aparecen los mensajes) */
+        .chat-box-body { flex: 1; padding: 15px; overflow-y: auto; background: #f9f9f9; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Estilos de Burbujas de Mensajes */
+        .chat-msg { max-width: 80%; padding: 10px; border-radius: 10px; font-size: 14px; line-height: 1.4; position: relative; }
+        .chat-msg.user { background: #007bff; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .chat-msg.bot { background: #e1e1e1; color: #333; align-self: flex-start; border-bottom-left-radius: 2px; }
+        .chat-msg-time { font-size: 10px; color: rgba(0,0,0,0.5); margin-top: 5px; display: block; }
+        .chat-msg.user .chat-msg-time { color: rgba(255,255,255,0.7); text-align: right; }
+
+        /* Campo de Entrada de Texto */
+        .chat-input-area { height: 50px; border-top: 1px solid #eee; display: flex; align-items: center; padding: 0 10px; background: white; }
+        .chat-input-area input { flex: 1; border: none; outline: none; height: 35px; font-size: 14px; }
+        .chat-submit { background: none; border: none; color: #004a99; cursor: pointer; font-weight: bold; font-size: 16px; margin-left: 10px; }
+        
+        /* Indicador de "Escribiendo..." */
+        .typing-indicator { font-style: italic; color: #888; font-size: 12px; margin-left: 15px; display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="chat-circle"> 💬 </div>
+
+    <div class="chat-box">
+        <div class="chat-box-header">
+            Rosso Asistente IA
+            <span class="chat-box-toggle">&times;</span>
+        </div>
+        
+        <div class="chat-box-body" id="chat-box-body">
+            <div class="chat-msg bot">
+                ¡Hola! 👋 Soy el asistente de Rosso Materiales. ¿Qué materiales necesitás para tu obra hoy? (PGC, chapas, perfiles...). Decime qué buscás y te ayudo.
+                <span class="chat-msg-time" id="welcome-time"></span>
+            </div>
+            </div>
+        
+        <div class="typing-indicator" id="typing-indicator">Rosso IA está escribiendo...</div>
+        
+        <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Ej: Necesito 20 PGC 100...">
+            <button type="submit" class="chat-submit" id="chat-submit">Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN VITAL ---
+        // Pegá acá la URL de tu Webhook de n8n (Production o Test)
+        const N8N_WEBHOOK_URL = "TU_URL_DE_WEBHOOK_N8N_ACA"; 
+        // ---------------------------
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const chatCircle = document.getElementById('chat-circle');
+            const chatBox = document.querySelector('.chat-box');
+            const chatBoxToggle = document.querySelector('.chat-box-toggle');
+            const chatInput = document.getElementById('chat-input');
+            const chatSubmit = document.getElementById('chat-submit');
+            const chatBody = document.getElementById('chat-box-body');
+            const typingIndicator = document.getElementById('typing-indicator');
+
+            // Poner hora actual al mensaje de bienvenida
+            document.getElementById('welcome-time').innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+            // 1. Abrir/Cerrar Chat
+            chatCircle.addEventListener('click', () => {
+                chatBox.style.display = 'flex';
+                chatCircle.style.display = 'none';
+            });
+
+            chatBoxToggle.addEventListener('click', () => {
+                chatBox.style.display = 'none';
+                chatCircle.style.display = 'block';
+            });
+
+            // 2. Función para renderizar burbujas de mensaje
+            function renderMessage(text, sender) {
+                const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const msgDiv = document.createElement('div');
+                msgDiv.classList.add('chat-msg', sender); // sender es 'user' o 'bot'
+                msgDiv.innerHTML = `${text}<span class="chat-msg-time">${time}</span>`;
+                chatBody.appendChild(msgDiv);
+                // Scroll automático al fondo
+                chatBody.scrollTop = chatBody.scrollHeight;
+            }
+
+            // 3. Función Principal: Enviar Mensaje y Conectar con n8n
+            async function sendMessage() {
+                const message = chatInput.value.trim();
+                if (message === "") return; // No enviar vacío
+
+                // A. Renderizar mensaje del usuario en pantalla
+                renderMessage(message, 'user');
+                chatInput.value = ''; // Limpiar input
+                
+                // B. Mostrar "Escribiendo..." y scroll
+                typingIndicator.style.display = 'block';
+                chatBody.scrollTop = chatBody.scrollHeight;
+
+                // C. Preparar datos para n8n (Estructura JSON según el Resumen)
+                const payload = {
+                    nombre: "Cliente Web (Rosso)", // Podrías capturarlo antes, por ahora genérico
+                    mensaje_cliente: message,
+                    telefono: "N/A", // No lo capturamos en este form simple
+                    timestamp: new Date().toISOString(),
+                    origen: "github_pages"
+                };
+
+                // D. Enviar POST request a n8n
+                try {
+                    const response = await fetch(N8N_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    // E. Ocultar "Escribiendo..."
+                    typingIndicator.style.display = 'none';
+
+                    if (response.ok) {
+                        // n8n respondió bien (200). Obtenemos la respuesta del chatbot
+                        // Asumimos que n8n devuelve JSON como: { "respuesta": "Hola, el precio es..." }
+                        const data = await response.json();
+                        if (data && data.respuesta) {
+                            renderMessage(data.respuesta, 'bot');
+                        } else {
+                            renderMessage("Recibí tu mensaje, pero hubo un tema con el formato de respuesta. Dame un segundo.", 'bot');
+                            console.error("n8n response format error:", data);
+                        }
+                    } else {
+                        renderMessage("Uy, che, hubo un problema al conectar con el servidor. Reintentá en un ratito.", 'bot');
+                        console.error("n8n connection error:", response.statusText);
+                    }
+                } catch (error) {
+                    typingIndicator.style.display = 'none';
+                    renderMessage("Lo siento, no pude enviar el mensaje. Revisá tu conexión.", 'bot');
+                    console.error("Fetch error:", error);
+                }
+            }
+
+            // 4. Eventos de Envío (Click y Enter)
+            chatSubmit.addEventListener('click', sendMessage);
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendMessage();
+            });
+        });
+    </script>
+</body>
+</html>
