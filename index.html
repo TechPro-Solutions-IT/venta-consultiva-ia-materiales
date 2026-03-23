@@ -64,105 +64,96 @@
     </div>
 
     <script>
-        // --- CONFIGURACIÓN VITAL ---
-        // Pegá acá la URL de tu Webhook de n8n (Production o Test)
-        const N8N_WEBHOOK_URL = "http://localhost:5678/webhook-test/246b75c4-8ca5-48bc-a830-4d72f56495e9"; 
-        // ---------------------------
+    // --- CONFIGURACIÓN VITAL ---
+    // REEMPLAZÁ esta URL por tu dirección de ngrok cuando lo actives
+    const N8N_WEBHOOK_URL = "http://localhost:5678/webhook-test/246b75c4-8ca5-48bc-a830-4d72f56495e9"; 
+    // ---------------------------
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const chatCircle = document.getElementById('chat-circle');
-            const chatBox = document.querySelector('.chat-box');
-            const chatBoxToggle = document.querySelector('.chat-box-toggle');
-            const chatInput = document.getElementById('chat-input');
-            const chatSubmit = document.getElementById('chat-submit');
-            const chatBody = document.getElementById('chat-box-body');
-            const typingIndicator = document.getElementById('typing-indicator');
+    document.addEventListener('DOMContentLoaded', () => {
+        const chatCircle = document.getElementById('chat-circle');
+        const chatBox = document.querySelector('.chat-box');
+        const chatBoxToggle = document.querySelector('.chat-box-toggle');
+        const chatInput = document.getElementById('chat-input');
+        const chatSubmit = document.getElementById('chat-submit');
+        const chatBody = document.getElementById('chat-box-body');
+        const typingIndicator = document.getElementById('typing-indicator');
 
-            // Poner hora actual al mensaje de bienvenida
-            document.getElementById('welcome-time').innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        document.getElementById('welcome-time').innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
-            // 1. Abrir/Cerrar Chat
-            chatCircle.addEventListener('click', () => {
-                chatBox.style.display = 'flex';
-                chatCircle.style.display = 'none';
-            });
-
-            chatBoxToggle.addEventListener('click', () => {
-                chatBox.style.display = 'none';
-                chatCircle.style.display = 'block';
-            });
-
-            // 2. Función para renderizar burbujas de mensaje
-            function renderMessage(text, sender) {
-                const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                const msgDiv = document.createElement('div');
-                msgDiv.classList.add('chat-msg', sender); // sender es 'user' o 'bot'
-                msgDiv.innerHTML = `${text}<span class="chat-msg-time">${time}</span>`;
-                chatBody.appendChild(msgDiv);
-                // Scroll automático al fondo
-                chatBody.scrollTop = chatBody.scrollHeight;
-            }
-
-            // 3. Función Principal: Enviar Mensaje y Conectar con n8n
-            async function sendMessage() {
-                const message = chatInput.value.trim();
-                if (message === "") return; // No enviar vacío
-
-                // A. Renderizar mensaje del usuario en pantalla
-                renderMessage(message, 'user');
-                chatInput.value = ''; // Limpiar input
-                
-                // B. Mostrar "Escribiendo..." y scroll
-                typingIndicator.style.display = 'block';
-                chatBody.scrollTop = chatBody.scrollHeight;
-
-                // C. Preparar datos para n8n (Estructura JSON según el Resumen)
-                const payload = {
-                    nombre: "Cliente Web (Rosso)", // Podrías capturarlo antes, por ahora genérico
-                    mensaje_cliente: message,
-                    telefono: "N/A", // No lo capturamos en este form simple
-                    timestamp: new Date().toISOString(),
-                    origen: "github_pages"
-                };
-
-                // D. Enviar POST request a n8n
-                try {
-                    const response = await fetch(N8N_WEBHOOK_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    // E. Ocultar "Escribiendo..."
-                    typingIndicator.style.display = 'none';
-
-                    if (response.ok) {
-                        // n8n respondió bien (200). Obtenemos la respuesta del chatbot
-                        // Asumimos que n8n devuelve JSON como: { "respuesta": "Hola, el precio es..." }
-                        const data = await response.json();
-                        if (data && data.respuesta) {
-                            renderMessage(data.respuesta, 'bot');
-                        } else {
-                            renderMessage("Recibí tu mensaje, pero hubo un tema con el formato de respuesta. Dame un segundo.", 'bot');
-                            console.error("n8n response format error:", data);
-                        }
-                    } else {
-                        renderMessage("Uy, che, hubo un problema al conectar con el servidor. Reintentá en un ratito.", 'bot');
-                        console.error("n8n connection error:", response.statusText);
-                    }
-                } catch (error) {
-                    typingIndicator.style.display = 'none';
-                    renderMessage("Lo siento, no pude enviar el mensaje. Revisá tu conexión.", 'bot');
-                    console.error("Fetch error:", error);
-                }
-            }
-
-            // 4. Eventos de Envío (Click y Enter)
-            chatSubmit.addEventListener('click', sendMessage);
-            chatInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') sendMessage();
-            });
+        chatCircle.addEventListener('click', () => {
+            chatBox.style.display = 'flex';
+            chatCircle.style.display = 'none';
         });
-    </script>
+
+        chatBoxToggle.addEventListener('click', () => {
+            chatBox.style.display = 'none';
+            chatCircle.style.display = 'block';
+        });
+
+        function renderMessage(text, sender) {
+            const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('chat-msg', sender);
+            msgDiv.innerHTML = `${text}<span class="chat-msg-time">${time}</span>`;
+            chatBody.appendChild(msgDiv);
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = chatInput.value.trim();
+            if (message === "") return;
+
+            // 1. Limpieza y Bloqueo de Input (El "Loop" de UX)
+            renderMessage(message, 'user');
+            chatInput.value = ''; // Limpiamos el campo inmediatamente
+            chatInput.disabled = true; // Bloqueamos para evitar spam
+            chatSubmit.disabled = true;
+            
+            typingIndicator.style.display = 'block';
+            chatBody.scrollTop = chatBody.scrollHeight;
+
+            const payload = {
+                nombre: "Fernando", // Podés dejarlo genérico o usar tu nombre
+                mensaje_cliente: message,
+                timestamp: new Date().toISOString(),
+                origen: "github_pages"
+            };
+
+            try {
+                const response = await fetch(N8N_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                typingIndicator.style.display = 'none';
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.respuesta) {
+                        renderMessage(data.respuesta, 'bot');
+                    } else {
+                        renderMessage("Recibí tu mensaje, pero n8n no devolvió una 'respuesta' válida.", 'bot');
+                    }
+                } else {
+                    renderMessage("Error de conexión con el bot. ¿Está prendido n8n?", 'bot');
+                }
+            } catch (error) {
+                typingIndicator.style.display = 'none';
+                renderMessage("Error crítico: " + error.message, 'bot');
+            } finally {
+                // 2. Desbloqueo: El bot queda listo para la siguiente pregunta
+                chatInput.disabled = false;
+                chatSubmit.disabled = false;
+                chatInput.focus(); // Ponemos el cursor listo para escribir de nuevo
+            }
+        }
+
+        chatSubmit.addEventListener('click', sendMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+    });
+</script>
 </body>
 </html>
